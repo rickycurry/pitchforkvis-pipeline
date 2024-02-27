@@ -2,14 +2,12 @@ import datetime
 import html
 import os
 
-import matplotlib.pyplot as plt
-
 import review
 import pandas
 import pickle
 
 
-REVIEWS_PATH = "./data/reviews/"
+REVIEWS_PATH = "../data/reviews/"
 
 ARTIST = "artist-links artist-list single-album-tombstone__artist-links\">"
 ALBUM_NAME = "single-album-tombstone__review-title\">"
@@ -140,7 +138,7 @@ def parse_review(filename):
 
 def iterate_reviews():
     try:
-        df = pickle.load(open("./data/reviews_dataframe.p", 'rb'))
+        df = pickle.load(open("../data/reviews_dataframe.p", 'rb'))
     except IOError:
         data = []
         for f in os.listdir(REVIEWS_PATH):
@@ -150,19 +148,11 @@ def iterate_reviews():
         print(len(data))
 
         df = pandas.DataFrame([r.to_dict() for r in data])
-        pickle.dump(df, open("./data/reviews_dataframe.p", 'wb'))
-
-    # print(df.dtypes)
+        pickle.dump(df, open("../data/reviews_dataframe.p", 'wb'))
 
     df.sort_values(by="score", inplace=True)
-    # print(df.head())
-    # print(df.mean(axis=0, skipna=True, numeric_only=True))
-    # print(df.median(axis=0, skipna=True, numeric_only=True))
-    #
-    # df.hist(column="score", bins=101)
-    # plt.show()
-    df.to_json("./data/reviews.json", orient="records")
-    df.to_csv("./data/reviews.csv", sep="\t")
+
+    df.to_json("../data/reviews.json", orient="records")
 
 
 if __name__ == "__main__":
