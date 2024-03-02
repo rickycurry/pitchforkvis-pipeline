@@ -1,160 +1,128 @@
-import datetime
-import html
 import os
-
-import review
-import pandas
 import pickle
+import time
+from pathlib import Path
+
+import pandas
+from progress.bar import IncrementalBar
+
+from review_parser import parse_review as parse
+from review_parser_old import parse_review as parse_old
+
+DATA_PATH = Path("../data/")
+REVIEWS_PATH = DATA_PATH / "reviews"
+UNPROCESSED_PATH = REVIEWS_PATH / "unprocessed"
+# UNPROCESSED_PATH = REVIEWS_PATH / "test_unprocessed"
+PROCESSED_PATH = REVIEWS_PATH / "processed"
+MULTIALBUM_PATH = REVIEWS_PATH / "multi-album"
+PROBLEM_PATH = REVIEWS_PATH / "problem_children"
+DATAFRAME_PATH = DATA_PATH / "reviews_dataframe.p"
+REVIEWS_JSON = DATA_PATH / "reviews.json"
+LOG_PATH = "./log.txt"
 
 
-REVIEWS_PATH = "../data/reviews/"
-
-ARTIST = "artist-links artist-list single-album-tombstone__artist-links\">"
-ALBUM_NAME = "single-album-tombstone__review-title\">"
-LABEL = "single-album-tombstone__meta-labels\">"
-RELEASE_YEAR = "single-album-tombstone__meta-year\">"
-SCORE = "score\">"
-AUTHOR = "authors-detail__display-name\">"
-AUTHOR_TITLE = "authors-detail__title\">"
-GENRE = "genre-list genre-list--before\">"
-PUBLISH_DATE = "pub-date\">"
-ABSTRACT = "review-detail__abstract\">"
-BODY = "review-detail__text clearfix\">"
+def log(string, category, verbose=False):
+    log_string = f"{time.strftime('%x %X', time.gmtime())} [{category}] {string}"
+    with open(LOG_PATH, 'a+') as log:
+        log.write(log_string)
+        log.write("\n")
+    if verbose:
+        print(log_string)
 
 
-def parse_review(filename):
-    if filename == ".DS_Store":
-        return
-    with open(REVIEWS_PATH + filename, encoding='utf-8') as f:
+def parse_review(filepath: Path):
+    with filepath.open(encoding='utf-8') as f:
         text = f.read()
-    artists = []
-    artist_split = text.split(ARTIST)
-    if len(artist_split) > 2:
-        return
-    text = artist_split[1]
-    text_split = text.split("</ul>", 1)
-    artists_s = text_split[0]
-    text = text_split[1]
-    artists_s_list = artists_s.split("</li>")
-    for s in artists_s_list:
-        s = s.split("</a>")[0]
-        artist = s.split(">")[-1]
-        artist = html.unescape(artist)
-        if len(artist) != 0:
-            artists.append(artist)
+    name = filepath.name
 
-    text = text.split(ALBUM_NAME)[-1]
-    text_split = text.split("<", 1)
-    album = text_split[0]
-    album = html.unescape(album)
-    text = text_split[1]
-
-    labels = []
-    text = text.split(LABEL, 1)[-1]
-    text_split = text.split("</ul>", 1)
-    labels_s = text_split[0]
-    text = text_split[1]
-    labels_s_list = labels_s.split("</li>")
-    for s in labels_s_list:
-        label = s.split(">")[-1]
-        label = html.unescape(label)
-        if len(label) != 0:
-            labels.append(label)
-
-    text = text.split(RELEASE_YEAR, 1)[-1]
-    text_split = text.split("</span>", 1)
-    year_s = text_split[0]
-    text = text_split[1]
-    year_s = year_s.split(">")[-1]
-    year_s_split = year_s.split("/")
-    year = None
     try:
-        year = int(year_s_split[0])
-    except ValueError:
-        pass
-    reissue_year = None
-    if len(year_s_split) > 1:
-        reissue_year = int(year_s_split[1])
-
-    text = text.split(SCORE, 1)[-1]
-    text_split = text.split("<", 1)
-    score = float(text_split[0])
-    text = text_split[1]
-
-    text = text.split(AUTHOR, 1)[-1]
-    text_split = text.split("<", 1)
-    author = text_split[0]
-    author = html.unescape(author)
-    text = text_split[1]
-
-    text_split = text.split(AUTHOR_TITLE, 1)
-    text = text_split[-1]
-    author_title = None
-    if len(text_split) > 1:
-        text_split = text.split("<", 1)
-        author_title = text_split[0]
-        text = text_split[1]
-
-    genres = []
-    text = text.split(GENRE, 1)[-1]
-    text_split = text.split("</ul>", 1)
-    genres_s = text_split[0]
-    text = text_split[1]
-    genres_s_list = genres_s.split("</li>")
-    for s in genres_s_list:
-        s = s.split("</a>")[0]
-        genre = s.split(">")[-1]
-        genre = html.unescape(genre)
-        if len(genre) != 0:
-            genres.append(genre)
-
-    text = text.split(PUBLISH_DATE, 1)[-1]
-    text = text.split(">", 1)[-1]
-    text_split = text.split("<", 1)
-    date_string = text_split[0]
-    publish_date = datetime.datetime.strptime(date_string, '%B %d %Y')
-    text = text_split[1]
-
-    text = text.split(ABSTRACT, 1)[-1]
-    text_split = text.split("</div>", 1)
-    abstract = text_split[0]
-    abstract = html.unescape(abstract)
-    # text = text_split[1]
-
-    review_obj = review.Review(artists,
-                               album,
-                               labels,
-                               year,
-                               reissue_year,
-                               score,
-                               author,
-                               author_title,
-                               genres,
-                               publish_date,
-                               abstract,
-                               None)
-    return review_obj
+        return parse_old(name, text)
+    except NotImplementedError:
+        log(f"Unable to deal with multi-album review {name}", "WARNING")
+        filepath.rename(MULTIALBUM_PATH / name)
+        return None
+    except:
+        try:
+            return parse(name, text)
+        except NotImplementedError:
+            log(f"Unable to deal with multi-album review {name}", "WARNING")
+            filepath.rename(MULTIALBUM_PATH / name)
+        except Exception as err:
+            log(f"Couldn't parse {name}", "WARNING")
+            log(f"{err.__str__()}", "WARNING")
+            filepath.rename(PROBLEM_PATH / name)
+        return None
 
 
-def iterate_reviews():
+def iterate_reviews(move_files=False, compress_processed=False):
+    MULTIALBUM_PATH.mkdir(exist_ok=True)
+    PROBLEM_PATH.mkdir(exist_ok=True)
+
+    num_unprocessed = len(os.listdir(UNPROCESSED_PATH))
+    if num_unprocessed == 0:
+        log("No reviews to process; exiting", "MESSAGE", True)
+        exit()
+        
+    bar = IncrementalBar('Processing new reviews', max=num_unprocessed)
+    data = []
+    successes = 0
+    failures = 0
+    for f in UNPROCESSED_PATH.glob('*.txt'):
+        parsed_review = parse_review(f)
+        if parsed_review is not None:
+            successes += 1
+            data.append(parsed_review)
+        else:
+            failures += 1
+        bar.next()
+    bar.finish()
+    log(f"Processing complete; {successes} successes and {failures} failures.", "MESSAGE", True)
+
+    if successes == 0:
+        exit(-1)
+
+    df = None
     try:
-        df = pickle.load(open("../data/reviews_dataframe.p", 'rb'))
+        df: pandas.DataFrame = pickle.load(DATAFRAME_PATH.open('rb'))
+        log(f"Successfully loaded dataframe; currently has {len(df.index)} rows", "MESSAGE", True)
     except IOError:
-        data = []
-        for f in os.listdir(REVIEWS_PATH):
-            parsed_review = parse_review(f)
-            if parsed_review is not None:
-                data.append(parsed_review)
-        print(len(data))
+        log("Could not open pickled dataframe", "WARNING", True)
 
-        df = pandas.DataFrame([r.to_dict() for r in data])
-        pickle.dump(df, open("../data/reviews_dataframe.p", 'wb'))
+    new_df = pandas.DataFrame([r.to_dict() for r in data])
+    if df is not None:
+        if len(df.columns) != len(new_df.columns):
+            log("Cannot concatenate old and new dataframes", "ERROR", True)
+            exit(-1)
+        df = pandas.concat([df, new_df], ignore_index=True)
+    else:
+        df = new_df
+    df.to_pickle(DATAFRAME_PATH)
+    log(f"Saved dataframe object; currently has {len(df.index)} rows", "MESSAGE", True)
 
     df.sort_values(by="score", inplace=True)
+    df.to_json(REVIEWS_JSON, orient="records")
+    log("Saved reviews JSON", "MESSAGE", True)
 
-    df.to_json("../data/reviews.json", orient="records")
+    if move_files:
+        PROCESSED_PATH.mkdir(exist_ok=True)
+        bar = IncrementalBar('Moving processed reviews', max=num_unprocessed)
+        for filename in UNPROCESSED_PATH.glob('*.txt'):
+            filename.rename(PROCESSED_PATH / filename.name)
+
+    if compress_processed:
+        raise NotImplementedError
+
+    exit(0)
 
 
 if __name__ == "__main__":
-    # parse_review("1-young-forever.txt")
-    iterate_reviews()
+    # print(parse_review("1-young-forever.txt")) # old format non-bnm
+    # print(parse_review("the-roots-do-you-want-more.txt")) # old format bnm
+    # print(parse_review("angelique-kidjo-mother-nature.txt")) # new format non-bnm
+    # print(parse_review("yves-tumor-praise-a-lord-who-chews-but-which-does-not-consume-or-simply-hot-between-worlds.txt")) # new format bnm
+    # print(parse_review("roc-marciano-the-alchemist-the-elephant-mans-bones.txt")) # new format multi-artist
+    # print(parse_review("ghost-second-time-around-temple-stone-ghost.txt")) # multi-genre
+    # print(parse_review("microstoria-init-ding-snd.txt")) # reissue
+    # print(parse_review("jennifer-lopez-this-is-me-now.txt")) # multi-label
+
+    iterate_reviews(move_files=True)

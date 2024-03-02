@@ -1,6 +1,7 @@
 import os
 import time
 import requests
+from pathlib import Path
 
 BASE_PAGE_URL = "https://pitchfork.com/reviews/albums/?page="
 BASE_REVIEW_URL = "https://pitchfork.com"
@@ -8,33 +9,37 @@ DELIMITER = 'class="review"><a href="'
 LOG_PATH = "./log.txt"
 NEWEST_FETCHED_PATH = "./newest_fetched.txt"
 NEWEST_FETCHED_TEMP_PATH = "./newest_fetched_temp.txt"
-REVIEW_DIRECTORY = "../data/reviews/"
+REVIEW_DIRECTORY = Path("../data/reviews/unprocessed")
 LOCAL_REVIEWS = set(os.listdir(REVIEW_DIRECTORY))
 SLEEP_TIME = 1 # second
 RETRY_ATTEMPTS = 5
 VERBOSE_LOGGING = True
 
 
-def log(string, category):
+def log(string, category, verbose=False):
+    log_string = f"{time.strftime('%x %X', time.gmtime())} [{category}] {string}"
     with open(LOG_PATH, 'a+') as log:
-        log.write(f"{time.strftime('%x %X', time.gmtime())} [{category}] {string}\n")
+        log.write(log_string)
+        log.write("\n")
+    if verbose:
+        print(log_string)
 
 
 def make_request(url):
     attempt = 1
     while attempt <= RETRY_ATTEMPTS:
-        review = requests.get(url)
-        status_string = f"URL {url} returned status {review.status_code}"
+        r = requests.get(url)
+        status_string = f"URL {url} returned status {r.status_code}"
         if VERBOSE_LOGGING:
             print(status_string)
 
         time.sleep(SLEEP_TIME)
 
-        if review.status_code == 200:
-            return review.text
+        if r.status_code == 200:
+            return r.text
         
-        elif review.status_code == 404:
-            raise AttributeError("404, end of the line")
+        elif r.status_code == 404:
+            teardown(True)
         
         log(f"{status_string} -- attempt #{attempt}", "WARNING")
         attempt += 1
@@ -47,14 +52,17 @@ def teardown(success):
     if success:
         os.remove(NEWEST_FETCHED_PATH)
         os.rename(NEWEST_FETCHED_TEMP_PATH, NEWEST_FETCHED_PATH)
-        log("Teardown complete", "MESSAGE")
+        log("Teardown complete", "MESSAGE", True)
+        exit(0)
     else:
         os.remove(NEWEST_FETCHED_TEMP_PATH)
-        log("Teardown complete but execution was not fully successful", "WARNING")
+        log("Teardown complete but execution was not fully successful", "WARNING", True)
+        exit(-1)
 
 
 def get_pages():
     i = 1
+    REVIEW_DIRECTORY.mkdir(exist_ok=True)
     try:
         newest_fetched_file = open(NEWEST_FETCHED_PATH, 'r')
     except FileNotFoundError:
@@ -62,9 +70,7 @@ def get_pages():
     else:
         with newest_fetched_file:
             newest_fetched_href = newest_fetched_file.readline().strip()
-            status_string = f"Previous newest fetched review is {newest_fetched_href}"
-            print(status_string)
-            log(status_string, "MESSAGE")
+            log(f"Previous newest fetched review is {newest_fetched_href}", "MESSAGE", True)
 
     keep_going = True
     while keep_going:
@@ -73,11 +79,6 @@ def get_pages():
             page = make_request(url)
         except ConnectionError:
             break
-        # I should make a custom exception for this
-        # 404 means we've made it all the way to the end of Pitchfork
-        except AttributeError: 
-            teardown(True)
-            exit()
         
         keep_going = get_reviews(page, newest_fetched_href)
         i += 1
@@ -99,9 +100,8 @@ def get_reviews(page, newest_fetched_href):
 
         # Check to see if we reached our target destination yet
         if href == newest_fetched_href:
-            log("Successfully reached previous newest fetched review", "MESSAGE")
+            log("Successfully reached previous newest fetched review", "MESSAGE", True)
             teardown(True)
-            exit()
 
         # Check if we already have the review
         album_name = href.split('/')[-2]
@@ -124,8 +124,8 @@ def get_review(href, album_name):
         return False
 
     print(f"Saving as {album_name}.txt")
-    with open(f"{REVIEW_DIRECTORY}unprocessed/{album_name}.txt", 'w') as out:
-    # with open(f"{REVIEW_DIRECTORY}{album_name}.txt", 'w') as out:
+    f_path = REVIEW_DIRECTORY / f"{album_name}.txt"
+    with f_path.open(mode='w') as out:
         out.write(review)
     return True
 
