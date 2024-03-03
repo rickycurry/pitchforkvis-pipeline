@@ -9,12 +9,13 @@ ARTWORK = "320w" #1, multiple
 ALBUM_NAME = '"headline":"' #1505, multiple
 ARTIST = 'SplitScreenContentHeaderArtist-ftloCc iUEiRd jqOMmZ kRtQWW">' #1520, multiple (as many as there are artists)
 RELEASE_YEAR = 'class="SplitScreenContentHeaderReleaseYear-UjuHP huwRqr">' #1520, multiple
+BNM_SCORE = 'class="ScoreCircle-jAxRuP akdGf"><p class="BaseWrap-sc-gjQpdd BaseText-ewhhUZ Rating-iATjmx iUEiRd hJnYqh dIdDAg">'
+SCORE = 'class="ScoreCircle-jAxRuP kFTFiL"><p class="BaseWrap-sc-gjQpdd BaseText-ewhhUZ Rating-iATjmx iUEiRd hJnYqh gtaikz">' #1524, multiple
 GENRE = 'Genre:</p><p class="BaseWrap-sc-gjQpdd BaseText-ewhhUZ InfoSliceValue-tfmqg iUEiRd dcTQYO fkSlPp">' #1520
 LABEL = 'Label:</p><p class="BaseWrap-sc-gjQpdd BaseText-ewhhUZ InfoSliceValue-tfmqg iUEiRd dcTQYO fkSlPp">' #1520
 PUBLISH_DATE = 'Reviewed:</p><p class="BaseWrap-sc-gjQpdd BaseText-ewhhUZ InfoSliceValue-tfmqg iUEiRd dcTQYO fkSlPp">' #1524, multiple
 AUTHOR_TITLE = '"dangerousTitle":"' #1524, multiple
 AUTHOR = '"name":"' #1524, multiple
-SCORE = '"score":' #1524, multiple
 BODY = ""
 MULTIREVIEW = 'MultiReviewContentHeaderArtist'
 
@@ -58,8 +59,17 @@ def parse_review(filename, text):
     year = int(year)
     reissue_year = None
 
-    genre, text = simple_parse(text, GENRE, '<')
-    genres = genre.split(' / ')
+    if text.find(SCORE) != -1:
+        score, text = simple_parse(text, SCORE, '<')
+    else:
+        score, text = simple_parse(text, BNM_SCORE, '<')
+    score = float(score)
+
+    if text.find(GENRE) != -1:
+        genre, text = simple_parse(text, GENRE, '<')
+        genres = genre.split(' / ')
+    else:
+        genres = []
 
     label, text = simple_parse(text, LABEL, '<')
     labels = label.split(' / ')
@@ -70,9 +80,6 @@ def parse_review(filename, text):
     author_title, text = simple_parse(text, AUTHOR_TITLE, '"')
 
     author, text = simple_parse(text, AUTHOR, '"')
-
-    score, text = simple_parse(text, SCORE, '}')
-    score = float(score)
 
     return review.Review(href,
                                artists,

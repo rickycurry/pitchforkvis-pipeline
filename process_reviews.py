@@ -12,7 +12,6 @@ from review_parser_old import parse_review as parse_old
 DATA_PATH = Path("../data/")
 REVIEWS_PATH = DATA_PATH / "reviews"
 UNPROCESSED_PATH = REVIEWS_PATH / "unprocessed"
-# UNPROCESSED_PATH = REVIEWS_PATH / "test_unprocessed"
 PROCESSED_PATH = REVIEWS_PATH / "processed"
 MULTIALBUM_PATH = REVIEWS_PATH / "multi-album"
 PROBLEM_PATH = REVIEWS_PATH / "problem_children"
@@ -61,7 +60,7 @@ def iterate_reviews(move_files=False, compress_processed=False):
     num_unprocessed = len(os.listdir(UNPROCESSED_PATH))
     if num_unprocessed == 0:
         log("No reviews to process; exiting", "MESSAGE", True)
-        exit()
+        exit(0)
         
     bar = IncrementalBar('Processing new reviews', max=num_unprocessed)
     data = []
@@ -105,9 +104,11 @@ def iterate_reviews(move_files=False, compress_processed=False):
 
     if move_files:
         PROCESSED_PATH.mkdir(exist_ok=True)
-        bar = IncrementalBar('Moving processed reviews', max=num_unprocessed)
+        bar = IncrementalBar('Moving processed reviews', max=len(os.listdir(UNPROCESSED_PATH)))
         for filename in UNPROCESSED_PATH.glob('*.txt'):
             filename.rename(PROCESSED_PATH / filename.name)
+            bar.next()
+        bar.finish()
 
     if compress_processed:
         raise NotImplementedError

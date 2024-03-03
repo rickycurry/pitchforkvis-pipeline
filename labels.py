@@ -1,7 +1,24 @@
 import pickle
 import pandas
 import numpy as np
+import time
 from collections import defaultdict
+from pathlib import Path
+
+
+DATA_PATH = Path("../data/")
+LABELS_JSON = DATA_PATH / "labels.json"
+DATAFRAME_PATH = DATA_PATH / "reviews_dataframe.p"
+LOG_PATH = "./log.txt"
+
+
+def log(string, category, verbose=False):
+    log_string = f"{time.strftime('%x %X', time.gmtime())} [{category}] {string}"
+    with open(LOG_PATH, 'a+') as log:
+        log.write(log_string)
+        log.write("\n")
+    if verbose:
+        print(log_string)
 
 #  we want the resulting data to look like
 #  [
@@ -44,7 +61,7 @@ class LabelData:
 
 def process_labels():
     #  load the dataframe
-    df: pandas.DataFrame = pickle.load(open("./data/reviews_dataframe.p", 'rb'))
+    df: pandas.DataFrame = pickle.load(DATAFRAME_PATH.open('rb'))
 
     labels_data = defaultdict(LabelData)
 
@@ -63,7 +80,9 @@ def process_labels():
 
     processed_labels.sort(key=lambda d: d["count"])
     label_frame = pandas.DataFrame(processed_labels)
-    label_frame.to_json("./data/labels.json", orient="records")
+    # TODO: we probably don't have to make a new dataframe every time we run this
+    label_frame.to_json(LABELS_JSON, orient="records")
+    log("Saved labels JSON", "MESSAGE", True)
 
 
 if __name__ == "__main__":

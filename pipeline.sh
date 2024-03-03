@@ -6,3 +6,4 @@ if [ $? -ne 0 ] ; then
     exit
 fi
 python3 -u process_reviews.py
+python3 -u labels.py
