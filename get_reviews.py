@@ -9,7 +9,9 @@ DELIMITER = 'class="review"><a href="'
 LOG_PATH = "./log.txt"
 NEWEST_FETCHED_PATH = "./newest_fetched.txt"
 NEWEST_FETCHED_TEMP_PATH = "./newest_fetched_temp.txt"
-REVIEW_DIRECTORY = Path("../data/reviews/unprocessed")
+DATA_DIRECTORY = Path("../data/")
+END_DATE_PATH = DATA_DIRECTORY / "end_date.txt"
+REVIEW_DIRECTORY = DATA_DIRECTORY / "reviews" / "unprocessed"
 LOCAL_REVIEWS = set(os.listdir(REVIEW_DIRECTORY))
 SLEEP_TIME = 1 # second
 RETRY_ATTEMPTS = 5
@@ -71,6 +73,9 @@ def get_pages():
         with newest_fetched_file:
             newest_fetched_href = newest_fetched_file.readline().strip()
             log(f"Previous newest fetched review is {newest_fetched_href}", "MESSAGE", True)
+
+    with END_DATE_PATH.open('w+') as end_date:
+        end_date.write(time.strftime("%B %Y"))
 
     keep_going = True
     while keep_going:
